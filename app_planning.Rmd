@@ -1,0 +1,189 @@
+---
+title: "app planning"
+author: "Zachary Hamilton"
+date: "06/12/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(extrafont)
+
+
+theme_set(theme_minimal() +
+          theme(text = element_text(family = "Verdana"),
+                panel.grid.major.x = element_blank(),
+                panel.grid.minor.x = element_blank()))
+
+
+climate_daily <- read_csv("data/climate_daily.csv")
+climate_hourly <- read_csv("data/climate_hourly.csv")
+climate_monthly <- read_csv("data/climate_monthly.csv")
+climate_yearly <- read_csv("data/climate_yearly.csv")
+stations <- read_csv("data/station_info.csv")
+
+```
+
+```{r}
+#Temperature totals
+
+
+#temp
+climate_daily %>%
+  filter(year(date) == 2015, city %in% c("Vancouver", "Toronto")) %>%
+  mutate(city = fct_reorder(city, temp_mean, mean)) %>%
+  ggplot(aes(date, temp_mean, col = city)) +
+  geom_line() +
+  geom_point() +
+  geom_ribbon(aes(ymin = temp_min, ymax = temp_max, fill = city), alpha = 0.2) +
+  scale_color_brewer(name = "City", type = "div", palette = "Accent") +
+  scale_fill_brewer(name = "City", type = "div", palette = "Accent") +
+  labs(title = "Mean daily temperature",
+       subtitle = "Ribbons indicate min/max observations",
+       x = "",
+       y = "Temperature (C)",
+       caption = "Data obtained from ECCC")
+
+#fix date 
+climate_monthly %>%
+  mutate(date = ymd(paste(year, month, "15", sep = "-"))) %>%
+  filter(year(date) %in% 2010:2015, city %in% c("Vancouver", "Toronto")) %>%
+  mutate(city = fct_reorder(city, temp_mean, mean)) %>%
+  ggplot(aes(date, temp_mean, col = city)) +
+  geom_line() +
+  geom_point() +
+  geom_ribbon(aes(ymin = temp_min, ymax = temp_max, fill = city), alpha = 0.2) +
+  scale_color_brewer(name = "City", type = "div", palette = "Accent") +
+  scale_fill_brewer(name = "City", type = "div", palette = "Accent") +
+  labs(title = "Mean daily temperature",
+       subtitle = "Ribbons indicate min/max observations",
+       x = "",
+       y = "Temperature (C)",
+       caption = "Data obtained from ECCC")
+
+climate_yearly %>%
+  mutate(date = ymd(paste(year, "06", "15", sep = "-"))) %>%
+  filter(year(date) %in% 2010:2015, city %in% c("Vancouver", "Toronto")) %>%
+  mutate(city = fct_reorder(city, temp_mean, mean)) %>%
+  ggplot(aes(date, temp_mean, col = city)) +
+  geom_line() +
+  geom_point() +
+  geom_ribbon(aes(ymin = temp_min, ymax = temp_max, fill = city), alpha = 0.2) +
+  scale_color_brewer(name = "City", type = "div", palette = "Accent") +
+  scale_fill_brewer(name = "City", type = "div", palette = "Accent") +
+  labs(title = "Mean daily temperature",
+       subtitle = "Ribbons indicate min/max observations",
+       x = "",
+       y = "Temperature (C)",
+       caption = "Data obtained from ECCC")
+
+
+```
+
+
+```{r}
+
+##precip static
+
+climate_daily %>%
+  filter(year(date) == 2018, city %in% c("Vancouver", "Toronto", "Montreal", "Victoria", "Ottawa"),
+         !is.na(total_precip)) %>%
+  mutate(city = fct_reorder(city, total_precip, sum, .desc = TRUE)) %>%
+  group_by(city) %>%
+  mutate(cum_total_precip = cumsum(total_precip)) %>% 
+  ggplot(aes(date, cum_total_precip, col = city)) +
+  geom_line(size = .9) +
+  theme(text = element_text(size = 14)) +
+  scale_color_brewer(name = "City", palette = "Blues") +
+  labs(title = "Cumulative Precipitation",
+       x = "",
+       y = "Total Precipitation (mm)",
+       caption = "Data obtained from ECCC")
+
+
+climate_monthly %>%
+  mutate(date = ymd(paste(year, month, "15", sep = "-"))) %>%
+  filter(year == 2017,
+         !is.na(total_precip_sum)) %>%
+  mutate(city = fct_reorder(city, total_precip_sum, sum, .desc = TRUE)) %>%
+  group_by(city, year) %>%
+  mutate(cum_total_precip = cumsum(total_precip_sum)) %>% 
+  ggplot(aes(date, cum_total_precip, col = city)) +
+  geom_line(size = .9) +
+  geom_point() +
+  theme(text = element_text(size = 14)) +
+  scale_color_brewer(name = "City", palette = "Blues") +
+  labs(title = "Cumulative Precipitation 2018",
+       x = "",
+       y = "Total Precipitation (mm)",
+       caption = "Data obtained from ECCC")
+
+
+climate_yearly %>%
+  mutate(date = ymd(paste(year, "06", "15", sep = "-"))) %>%
+  filter(year %in% 2014:2015,
+         !is.na(total_precip_sum)) %>% 
+  mutate(city = fct_reorder(city, total_precip_sum, sum, .desc = TRUE, na.rm = TRUE)) %>%
+  group_by(city) %>%
+  mutate(cum_total_precip = cumsum(total_precip_sum)) %>%
+  ggplot(aes(date, cum_total_precip, col = city)) +
+  geom_line(size = .9) +
+  geom_point() +
+  theme(text = element_text(size = 14)) +
+  scale_color_brewer(name = "City", palette = "Blues") +
+  labs(title = "Cumulative Precipitation",
+       x = "",
+       y = "Total Precipitation (mm)",
+       caption = "Data obtained from ECCC")
+```
+
+
+```{r}
+#precip animation
+library(gganimate)
+
+p <- climate_daily %>%
+  filter(year(date) == 2018, city %in% c("Vancouver", "Toronto", "Montreal", "Victoria", "Ottawa"),
+         !is.na(total_precip)) %>%
+  mutate(city = fct_reorder(city, total_precip, sum, .desc = TRUE)) %>%
+  group_by(city) %>%
+  mutate(cum_total_precip = cumsum(total_precip)) %>% 
+  ggplot(aes(date, cum_total_precip, col = city)) +
+  geom_line(size = .9) +
+  geom_image(aes(image = "img/raindrop.png"), size = 0.02 ) +
+  theme(text = element_text(size = 14)) +
+  scale_color_discrete(name = "City") +
+  labs(title = "Cumulative Precipitation 2018",
+       x = "",
+       y = "Total Precipitation (mm)",
+       caption = "Data obtained from ECCC") +
+  transition_reveal(id = city, along = date) 
+
+animate(p, nframes = 50)
+
+anim_save("plots/precip_anim_loop.gif")
+```
+
+
+```{r}
+        switch("monthly",
+                "daily" = climate_daily,
+                "monthly" = climate_monthly,
+                "yearly" = climate_yearly) %>%
+      filter(year )
+```
+
+
+```{r}
+climate_daily %>%
+  group_by(city) %>%
+  mutate(cum_total_precip = cumsum(total_precip)) %>% summary()
+
+climate_yearly %>%
+  group_by(city)
+```
