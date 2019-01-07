@@ -54,21 +54,21 @@ ui <- fluidPage(
             
             conditionalPanel("input.freq == `daily`",
                              dateRangeInput(inputId = "date_d", label = "Date range to display", 
-                                            start = "2018-01-01", end = "2018-12-01",
-                                            min = "2004-01-01", max = today(),
+                                            start = "2018-01-01", end = "2018-12-31",
+                                            min = "1953-01-01", max = today(),
                                             startview = "month" )),
                             
             
             conditionalPanel("input.freq == `monthly`",
                              dateRangeInput(inputId = "date_m", label = "Date range to display", 
-                                            start = "2016-01-01", end = "2018-12-01",
-                                            min = "2004-01-01", max = today(),
+                                            start = "2016-01-01", end = "2018-12-31",
+                                            min = "1953-01-01", max = today(),
                                             startview = "year", format = "yyyy-mm")),
             
             conditionalPanel("input.freq == `yearly`",
                              dateRangeInput(inputId = "date_y", label = "Date range to display", 
-                                            start = "2010-01-01", end = "2018-12-01",
-                                            min = "2004-01-01", max = today(),
+                                            start = "2010-01-01", end = "2018-12-31",
+                                            min = "1953-01-01", max = today(),
                                             startview = "decade", format = "yyyy"))
         ),
         
@@ -120,7 +120,7 @@ server <- function(input, output) {
            p <- datasetInput() %>%
                 ggplot(aes_string(x = "date", y = input$observe)) +
                 geom_line(aes(col = city)) +
-                geom_point(aes(col = city)) +
+                geom_point(aes(col = city), size = 1) +
                 geom_ribbon(aes(ymin = temp_min, ymax = temp_max, fill = city), alpha = 0.2) +
                 scale_color_manual(name = "City", values = brewer.pal(9, "Set1")) +
                 scale_fill_manual(values = brewer.pal(9, "Set1"), guide = FALSE) +
@@ -167,10 +167,12 @@ server <- function(input, output) {
     output$extremes <- DT::renderDataTable(caption = "Extreme values from selected time period",
                                            {
         req(input$cities)
-        datasetInput() %>%
+        table <- datasetInput() %>%
             group_by(city) %>%
             mutate(max_obs = max(get(input$observe)),
-                   min_obs = min(get(input$observe))) %>%
+                   min_obs = min(get(input$observe)),
+                   month = month(date, label = TRUE),
+                   year = year(date)) %>%
             filter(get(input$observe) == max_obs | get(input$observe) == min_obs) %>%
             mutate("Observation" = case_when(get(input$observe) == max_obs ~ max_obs,
                                              get(input$observe) == min_obs ~ min_obs,
@@ -180,8 +182,15 @@ server <- function(input, output) {
                                                   TRUE ~ NA_character_)) %>%
             group_by(city, `Observation Type`, `Observation`) %>%
             slice(1) %>%
-            ungroup() %>%
-            select(city, date, `Observation Type`, `Observation`)
+            ungroup()
+        
+        DT::datatable(
+        switch(input$freq,
+               "daily" = select(table, city, date, `Observation Type`, `Observation`),
+               "monthly" = select(table, city, month, year, `Observation Type`, `Observation`),
+               "yearly" = select(table, city, year, `Observation Type`, `Observation`))
+        )           
+
     })
     
     output$stations <- DT::renderDataTable({
@@ -196,12 +205,11 @@ server <- function(input, output) {
     })
     
     output$copy <- renderText({
-        "Data obtained from Environment and Climate Change Canada (ECCC) using the weathercan package"
+    "Data obtained from Environment and Climate Change Canada (ECCC) using the weathercan package"
     })
     
     output$about <- renderText({
     "Major Canadian cities were chosen based on availability and consistency of data at airport weather stations"
-
     })
     
 }

@@ -1,5 +1,5 @@
 ---
-title: "app planning"
+title: "app ideas"
 author: "Zachary Hamilton"
 date: "06/12/2018"
 output: html_document
@@ -187,3 +187,64 @@ climate_daily %>%
 climate_yearly %>%
   group_by(city)
 ```
+
+
+```{r}
+#### ----------------------------------------------------------------------
+
+climate_hourly_raw <- read_csv("data/climate_hourly_raw.csv")
+climate_daily_raw <- read_csv("data/climate_daily_raw.csv")
+
+
+
+climate_daily_van_raw <- weather_dl(c(833, 889, 51442), start = "1900-01-01", interval = "day")
+
+theme_set(theme_minimal() +
+            theme(text = element_text(family = "Verdana"),
+                  panel.grid.major.x = element_blank(),
+                  panel.grid.minor.x = element_blank()))
+
+climate_daily_van <- climate_daily_van_raw %>%
+  mutate(region = case_when(str_detect(station_name, "WHARVES") ~ "North Van (Wharf)",
+                            TRUE ~ "YVR")) %>%
+  select(region, date, year, month, day, total_precip) %>%
+  filter(!is.na(total_precip), year >= 1962)
+
+
+data <- climate_daily_van %>%
+  group_by(region, year) %>%
+  mutate(cum_total_precip = cumsum(total_precip)) %>% 
+  summarize(`total_precip (mm)` = max(cum_total_precip)) %>%
+  arrange(desc(`total_precip (mm)`)) %>%
+  ungroup() %>%
+  mutate(rank = row_number()) %>%
+  filter(rank <= 50)
+
+  ggplot(data, aes(rank, `total_precip (mm)`, fill = region)) +
+  geom_col(position = "dodge") +
+  geom_label_repel(data = data %>% group_by(region) %>%
+                      filter(`total_precip (mm)` == max(`total_precip (mm)`)),
+             aes(label = paste(year, ", ", `total_precip (mm)`, "mm", sep = ""))) +
+  scale_fill_manual(name = "Station", values = c("#195fd1", '#84d119')) +
+  labs(title = "Top 50 Highest precipitation years since 1962 (North Van/YVR)",
+       subtitle = "top 41 all belong to North Van",
+       x = "Rank",
+       y = "Total Yearly Precipitation",
+       caption = "data obtained from ECCC")
+
+climate_daily_van %>%
+  filter(year %in% c(2015, 2016, 2017, 2018)) %>%
+  group_by(region, year) %>%
+  mutate(cum_total_precip = cumsum(total_precip)) %>% 
+  ggplot(aes(date, cum_total_precip, col = region)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(name = "Station", values = c("#195fd1", '#84d119')) +
+  theme(axis.text.x = element_blank()) +
+  facet_wrap(~year, scales = "free_x") +
+  labs(title = "Precipitation disparity between North Van and YVR",
+       x = "",
+       y = "Cumulative total precip (mm)",
+       caption = "data obtained from ECCC")
+
+```
+
